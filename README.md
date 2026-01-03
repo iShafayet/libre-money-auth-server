@@ -1,16 +1,21 @@
 # Libre Money Authentication Server
 
-A centralized authentication service that maps user credentials to their corresponding CouchDB server URL and domain.
+A centralized pre-authentication service that maps user credentials to their corresponding CouchDB server URL and domain. This service validates user credentials against remote CouchDB servers and returns the appropriate server configuration for client applications.
 
 ## Features
 
-- User authentication via username/password
-- CouchDB integration for user data storage
-- Rate limiting (5 attempts per IP per 15 minutes)
-- Secure password hashing with bcrypt
-- CORS support
+- Pre-authentication via username/password against remote CouchDB servers
+- User-to-server mapping stored in a centralized CouchDB database
+- Rate limiting to prevent brute force attacks (5 attempts per IP per 15 minutes)
+- Generic error messages to prevent username enumeration
+- Input validation and sanitization (username trimming, type checking)
+- CORS support with configurable origins
+- Credentials validated against remote CouchDB servers (no password storage)
+- Comprehensive error handling with appropriate HTTP status codes
 - Health check endpoint
 - TypeScript for type safety
+- Comprehensive logging for debugging
+- Automatic mapping database initialization
 
 ## Prerequisites
 
@@ -25,17 +30,7 @@ A centralized authentication service that maps user credentials to their corresp
 npm install
 ```
 
-2. Copy the example environment file:
-```bash
-cp .env.example .env
-```
-
-3. Update `.env` with your CouchDB credentials and server configuration.
-
-4. Initialize the database:
-```bash
-npm run setup
-```
+2. Create a `.env` file with your configuration (see Configuration section below).
 
 ## Configuration
 
@@ -45,10 +40,20 @@ Edit `.env` file with your settings:
 COUCHDB_URL=http://localhost:5984
 COUCHDB_MASTER_ADMIN_USERNAME=admin
 COUCHDB_MASTER_ADMIN_PASSWORD=password
+COUCHDB_MAPPING_DATABASE_NAME=user_mappings
 PORT=3000
 NODE_ENV=production
 CORS_ORIGIN=*
 ```
+
+**Required Environment Variables:**
+- `COUCHDB_URL`: The URL of your CouchDB server
+- `COUCHDB_MASTER_ADMIN_USERNAME`: Master admin username for CouchDB
+- `COUCHDB_MASTER_ADMIN_PASSWORD`: Master admin password for CouchDB
+- `COUCHDB_MAPPING_DATABASE_NAME`: Name of the database that stores user-to-server mappings
+- `PORT`: Port number for the server (default: 3000)
+- `NODE_ENV`: Environment mode (development/production)
+- `CORS_ORIGIN`: CORS origin (use `*` for all origins)
 
 ## Running the Server
 
@@ -65,9 +70,9 @@ npm start
 
 ## API Endpoints
 
-### POST `/authenticate`
+### POST `/pre-authenticate`
 
-Authenticates a user and returns their server configuration.
+Pre-authenticates a user by validating credentials against their remote CouchDB server and returns their server configuration.
 
 **Request:**
 ```json
@@ -88,9 +93,15 @@ Authenticates a user and returns their server configuration.
 
 **Error Responses:**
 - `400 Bad Request`: Invalid request body or missing fields
-- `401 Unauthorized`: Invalid credentials
-- `403 Forbidden`: Account is inactive
-- `500 Internal Server Error`: Server error
+- `401 Unauthorized`: Invalid credentials (username or password incorrect)
+- `429 Too Many Requests`: Rate limit exceeded (5 attempts per 15 minutes)
+- `500 Internal Server Error`: Server error or unable to connect to remote CouchDB
+
+**Authentication Flow:**
+1. Lookup user mapping in the centralized database to get `serverUrl` and `domain`
+2. Validate credentials against the remote CouchDB server using the user's credentials
+3. Update `lastLoginAt` timestamp on successful authentication
+4. Return server configuration to the client
 
 ### GET `/health`
 
@@ -103,45 +114,6 @@ Health check endpoint for monitoring.
   "timestamp": "2024-01-15T10:30:00.000Z"
 }
 ```
-
-## Project Structure
-
-```
-.local/
-├── src/
-│   ├── config/
-│   │   └── env.ts              # Environment variable validation
-│   ├── database/
-│   │   ├── couchdb.ts          # CouchDB connection and setup
-│   │   ├── user-repository.ts  # User data access layer
-│   │   └── setup.ts            # Database setup script
-│   ├── middleware/
-│   │   ├── rate-limiter.ts     # Rate limiting middleware
-│   │   ├── error-handler.ts    # Error handling middleware
-│   │   └── validator.ts        # Request validation middleware
-│   ├── routes/
-│   │   └── auth.ts             # Authentication routes
-│   ├── services/
-│   │   ├── auth-service.ts     # Authentication logic
-│   │   └── password-service.ts # Password hashing/verification
-│   ├── types/
-│   │   └── index.ts            # TypeScript type definitions
-│   ├── app.ts                  # Express app setup
-│   └── server.ts               # Server entry point
-├── .env.example                # Example environment variables
-├── package.json
-├── tsconfig.json
-└── README.md
-```
-
-## Security Features
-
-- Password hashing with bcrypt (10 salt rounds)
-- Rate limiting to prevent brute force attacks
-- Generic error messages to prevent username enumeration
-- Input validation and sanitization
-- CORS configuration
-- No sensitive data in logs
 
 ## Testing
 
