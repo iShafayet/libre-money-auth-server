@@ -7,10 +7,15 @@ export function errorHandler(
   res: Response,
   next: NextFunction
 ): void {
-  console.error('Error:', err);
-
   // Don't leak error details in production
   const isDevelopment = process.env.NODE_ENV === 'development';
+  
+  if (isDevelopment) {
+    console.error('Error:', err);
+  } else {
+    // In production, only log error message, not full stack trace
+    console.error('Error:', err.message);
+  }
 
   // Handle specific error types
   if (err.name === 'ValidationError') {
