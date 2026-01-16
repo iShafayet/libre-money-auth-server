@@ -1,12 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { AuthService } from '../services/auth-service';
-import { PreAuthenticateRequest, PreAuthenticateResponse, ErrorResponse } from '../types';
-import { validatePreAuthenticateRequest } from '../middleware/validator';
+import { MappingRepository } from '../database/mapping-repository';
+import { PreAuthenticateRequest, PreAuthenticateResponse, ErrorResponse, LaunchPromoSignupRequest, LaunchPromoSignupResponse } from '../types';
+import { validatePreAuthenticateRequest, validateLaunchPromoSignupRequest } from '../middleware/validator';
 import { authRateLimiter } from '../middleware/rate-limiter';
 import { logger } from '../utils/logger';
 
 const router = Router();
 const authService = new AuthService();
+const mappingRepository = new MappingRepository();
 
 router.post(
   '/pre-authenticate',
@@ -72,6 +74,47 @@ router.post(
       logger.debug('[AUTH] Error stack:', error.stack);
 
       // Generic server error
+      res.status(500).json({
+        error: 'An internal server error occurred. Please try again later.',
+      } as ErrorResponse);
+    }
+  }
+);
+
+router.post(
+  '/ephemeral/launch-promo-signup',
+  authRateLimiter,
+  validateLaunchPromoSignupRequest,
+  async (req: Request, res: Response): Promise<void> => {
+    const { email, fullname } = req.body as LaunchPromoSignupRequest;
+    logger.debug('[AUTH] Launch promo signup request received for email:', email);
+    logger.debug('[AUTH] Request IP:', req.ip || req.socket.remoteAddress);
+    logger.debug('[AUTH] Request headers:', {
+      'user-agent': req.headers['user-agent'],
+      'content-type': req.headers['content-type'],
+    });
+
+    try {
+      logger.debug('[AUTH] Starting launch promo signup process for email:', email);
+      const wasAlreadyRegistered = await mappingRepository.registerLaunchPromoSignup(email, fullname);
+
+      const message = wasAlreadyRegistered ? 'Already registered' : 'Registered successfully';
+      const response: LaunchPromoSignupResponse = {
+        message,
+        wasAlreadyRegistered,
+      };
+
+      logger.debug('[AUTH] Launch promo signup successful for email:', email);
+      logger.debug('[AUTH] Response:', response);
+
+      res.status(200).json(response);
+    } catch (error: any) {
+      // Log unexpected errors
+      console.error('[AUTH] Unexpected launch promo signup error for email:', email);
+      console.error('[AUTH] Error:', error);
+      logger.debug('[AUTH] Error stack:', error.stack);
+
+      // Generic server error (similar to pre-authenticate)
       res.status(500).json({
         error: 'An internal server error occurred. Please try again later.',
       } as ErrorResponse);

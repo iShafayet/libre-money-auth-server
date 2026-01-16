@@ -1,5 +1,5 @@
 import { getMappingDatabase } from './couchdb';
-import { MappingDocument } from '../types';
+import { MappingDocument, LaunchPromoSignupDocument } from '../types';
 
 export class MappingRepository {
   private db = getMappingDatabase();
@@ -58,5 +58,50 @@ export class MappingRepository {
       ...mapping,
       _rev: result.rev,
     };
+  }
+
+  /**
+   * Register a launch promo signup
+   * Returns true if already registered, false if newly registered
+   */
+  async registerLaunchPromoSignup(
+    email: string,
+    fullname: string
+  ): Promise<boolean> {
+    try {
+      // Use email as document ID for easy lookup
+      const docId = `launch-promo-signup:${email}`;
+      
+      // Check if document already exists
+      try {
+        const existing = await this.db.get(docId) as any;
+        if (existing && existing.$collection === 'launch-promo-signup') {
+          return true; // Already registered
+        }
+      } catch (error: any) {
+        if (error.statusCode !== 404) {
+          throw error;
+        }
+        // Document doesn't exist, continue to create
+      }
+
+      // Create new document
+      const newDoc: Omit<LaunchPromoSignupDocument, '_rev'> = {
+        _id: docId,
+        $collection: 'launch-promo-signup',
+        email,
+        fullname,
+        createdAt: new Date().toISOString(),
+      };
+
+      await this.db.insert(newDoc);
+      return false; // Newly registered
+    } catch (error: any) {
+      // If error is due to document conflict (already exists), return true
+      if (error.statusCode === 409) {
+        return true;
+      }
+      throw error;
+    }
   }
 }

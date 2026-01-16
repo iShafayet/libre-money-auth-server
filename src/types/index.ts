@@ -33,3 +33,22 @@ export interface MappingDocument {
   domain: string;          // The CouchDB database name (domain) for the user
   lastLoginAt?: number;    // Timestamp of last login (Date.now())
 }
+
+export interface LaunchPromoSignupRequest {
+  email: string;
+  fullname: string;
+}
+
+export interface LaunchPromoSignupResponse {
+  message: string;
+  wasAlreadyRegistered: boolean;
+}
+
+export interface LaunchPromoSignupDocument {
+  _id: string;              // CouchDB document ID (email)
+  _rev?: string;            // CouchDB revision (auto-generated)
+  $collection: 'launch-promo-signup';
+  email: string;
+  fullname: string;
+  createdAt: string;        // ISO 8601 timestamp
+}
