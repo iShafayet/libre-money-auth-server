@@ -1,5 +1,5 @@
 import { getMappingDatabase } from './couchdb';
-import { MappingDocument, LaunchPromoSignupDocument } from '../types';
+import { MappingDocument, LaunchPromoSignupDocument, TelemetryDocument, TelemetryPayload } from '../types';
 
 export class MappingRepository {
   private db = getMappingDatabase();
@@ -103,5 +103,29 @@ export class MappingRepository {
       }
       throw error;
     }
+  }
+
+  /**
+   * Store telemetry data
+   */
+  async storeTelemetry(
+    event: 'offline-onboarding',
+    payload: TelemetryPayload
+  ): Promise<void> {
+    // Generate unique document ID using timestamp and username
+    const timestamp = Date.now();
+    const docId = `telemetry:${event}:${timestamp}:${payload.username}`;
+
+    const telemetryDoc: Omit<TelemetryDocument, '_rev'> = {
+      _id: docId,
+      $collection: 'telemetry',
+      event,
+      username: payload.username,
+      currency: payload.currency,
+      email: payload.email,
+      createdAt: new Date().toISOString(),
+    };
+
+    await this.db.insert(telemetryDoc);
   }
 }

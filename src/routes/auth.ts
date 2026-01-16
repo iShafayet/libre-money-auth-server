@@ -1,8 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { AuthService } from '../services/auth-service';
 import { MappingRepository } from '../database/mapping-repository';
-import { PreAuthenticateRequest, PreAuthenticateResponse, ErrorResponse, LaunchPromoSignupRequest, LaunchPromoSignupResponse } from '../types';
-import { validatePreAuthenticateRequest, validateLaunchPromoSignupRequest } from '../middleware/validator';
+import { PreAuthenticateRequest, PreAuthenticateResponse, ErrorResponse, LaunchPromoSignupRequest, LaunchPromoSignupResponse, TelemetryPayload, TelemetryResponse } from '../types';
+import { validatePreAuthenticateRequest, validateLaunchPromoSignupRequest, validateTelemetryRequest } from '../middleware/validator';
 import { authRateLimiter } from '../middleware/rate-limiter';
 import { logger } from '../utils/logger';
 
@@ -111,6 +111,45 @@ router.post(
     } catch (error: any) {
       // Log unexpected errors
       console.error('[AUTH] Unexpected launch promo signup error for email:', email);
+      console.error('[AUTH] Error:', error);
+      logger.debug('[AUTH] Error stack:', error.stack);
+
+      // Generic server error (similar to pre-authenticate)
+      res.status(500).json({
+        error: 'An internal server error occurred. Please try again later.',
+      } as ErrorResponse);
+    }
+  }
+);
+
+router.post(
+  '/telemetry/offline-onboarding',
+  authRateLimiter,
+  validateTelemetryRequest,
+  async (req: Request, res: Response): Promise<void> => {
+    const payload = req.body as TelemetryPayload;
+    logger.debug('[AUTH] Telemetry offline-onboarding request received for username:', payload.username);
+    logger.debug('[AUTH] Request IP:', req.ip || req.socket.remoteAddress);
+    logger.debug('[AUTH] Request headers:', {
+      'user-agent': req.headers['user-agent'],
+      'content-type': req.headers['content-type'],
+    });
+
+    try {
+      logger.debug('[AUTH] Starting telemetry storage for username:', payload.username);
+      await mappingRepository.storeTelemetry('offline-onboarding', payload);
+
+      const response: TelemetryResponse = {
+        message: 'Telemetry recorded successfully',
+      };
+
+      logger.debug('[AUTH] Telemetry storage successful for username:', payload.username);
+      logger.debug('[AUTH] Response:', response);
+
+      res.status(200).json(response);
+    } catch (error: any) {
+      // Log unexpected errors
+      console.error('[AUTH] Unexpected telemetry error for username:', payload.username);
       console.error('[AUTH] Error:', error);
       logger.debug('[AUTH] Error stack:', error.stack);
 

@@ -52,3 +52,24 @@ export interface LaunchPromoSignupDocument {
   fullname: string;
   createdAt: string;        // ISO 8601 timestamp
 }
+
+export interface TelemetryPayload {
+  username: string;
+  currency: string | { name: string; sign: string };
+  email?: string;
+}
+
+export interface TelemetryResponse {
+  message: string;
+}
+
+export interface TelemetryDocument {
+  _id: string;              // CouchDB document ID
+  _rev?: string;            // CouchDB revision (auto-generated)
+  $collection: 'telemetry';
+  event: 'offline-onboarding';
+  username: string;
+  currency: string | { name: string; sign: string };
+  email?: string;
+  createdAt: string;        // ISO 8601 timestamp
+}
