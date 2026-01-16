@@ -1,5 +1,6 @@
 import { getMappingDatabase } from './couchdb';
 import { MappingDocument, LaunchPromoSignupDocument, TelemetryDocument, TelemetryPayload } from '../types';
+import { sanitizeEmailForDocId, sanitizeUsernameForDocId } from '../utils/sanitizer';
 
 export class MappingRepository {
   private db = getMappingDatabase();
@@ -69,8 +70,9 @@ export class MappingRepository {
     fullname: string
   ): Promise<boolean> {
     try {
-      // Use email as document ID for easy lookup
-      const docId = `launch-promo-signup:${email}`;
+      // Use email as document ID for easy lookup (sanitize email for document ID)
+      const sanitizedEmail = sanitizeEmailForDocId(email);
+      const docId = `launch-promo-signup:${sanitizedEmail}`;
       
       // Check if document already exists
       try {
@@ -85,11 +87,11 @@ export class MappingRepository {
         // Document doesn't exist, continue to create
       }
 
-      // Create new document
+      // Create new document (use sanitized email in document, but keep original for display)
       const newDoc: Omit<LaunchPromoSignupDocument, '_rev'> = {
         _id: docId,
         $collection: 'launch-promo-signup',
-        email,
+        email: sanitizedEmail, // Use sanitized email
         fullname,
         createdAt: new Date().toISOString(),
       };
@@ -112,9 +114,10 @@ export class MappingRepository {
     event: 'offline-onboarding',
     payload: TelemetryPayload
   ): Promise<void> {
-    // Generate unique document ID using timestamp and username
+    // Generate unique document ID using timestamp and username (sanitize username for document ID)
     const timestamp = Date.now();
-    const docId = `telemetry:${event}:${timestamp}:${payload.username}`;
+    const sanitizedUsername = sanitizeUsernameForDocId(payload.username);
+    const docId = `telemetry:${event}:${timestamp}:${sanitizedUsername}`;
 
     const telemetryDoc: Omit<TelemetryDocument, '_rev'> = {
       _id: docId,

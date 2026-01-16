@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { PreAuthenticateRequest, LaunchPromoSignupRequest, TelemetryPayload } from '../types';
+import { sanitizeUsernameForDocId, sanitizeEmailForDocId, sanitizeFullname, sanitizeCurrencyString } from '../utils/sanitizer';
 
 export function validatePreAuthenticateRequest(
   req: Request,
@@ -22,8 +23,8 @@ export function validatePreAuthenticateRequest(
     return;
   }
 
-  // Sanitize username (trim whitespace)
-  req.body.username = username.trim();
+  // Sanitize username (remove control characters, trim whitespace)
+  req.body.username = sanitizeUsernameForDocId(username);
 
   next();
 }
@@ -58,9 +59,9 @@ export function validateLaunchPromoSignupRequest(
     return;
   }
 
-  // Sanitize inputs (trim whitespace)
-  req.body.email = email.trim().toLowerCase();
-  req.body.fullname = fullname.trim();
+  // Sanitize inputs (remove control characters, trim whitespace)
+  req.body.email = sanitizeEmailForDocId(email.trim().toLowerCase());
+  req.body.fullname = sanitizeFullname(fullname);
 
   next();
 }
@@ -130,20 +131,20 @@ export function validateTelemetryRequest(
       });
       return;
     }
-    // Sanitize email (trim and lowercase)
-    req.body.email = email.trim().toLowerCase();
+    // Sanitize email (remove control characters, trim and lowercase)
+    req.body.email = sanitizeEmailForDocId(email.trim().toLowerCase());
   }
 
-  // Sanitize username (trim whitespace)
-  req.body.username = username.trim();
+  // Sanitize username (remove control characters, trim whitespace)
+  req.body.username = sanitizeUsernameForDocId(username);
 
   // Sanitize currency
   if (typeof currency === 'string') {
-    req.body.currency = currency.trim();
+    req.body.currency = sanitizeCurrencyString(currency);
   } else {
     req.body.currency = {
-      name: currency.name.trim(),
-      sign: currency.sign.trim(),
+      name: sanitizeCurrencyString(currency.name),
+      sign: sanitizeCurrencyString(currency.sign),
     };
   }
 
